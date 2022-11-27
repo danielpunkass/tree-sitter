@@ -617,6 +617,9 @@ void ts_subtree_release(SubtreePool *pool, Subtree self) {
 }
 
 int ts_subtree_compare(Subtree left, Subtree right) {
+  // Some insidious situation causes left and right to match, which leads to an infinite recursion.
+  if (left.ptr == right.ptr) return 0;
+
   if (ts_subtree_symbol(left) < ts_subtree_symbol(right)) return -1;
   if (ts_subtree_symbol(right) < ts_subtree_symbol(left)) return 1;
   if (ts_subtree_child_count(left) < ts_subtree_child_count(right)) return -1;

@@ -24,14 +24,11 @@
 #include "./wasm_store.h"
 
 #define LOG(...)                                                                            \
-  if (self->lexer.logger.log || self->dot_graph_file) {                                     \
-    snprintf(self->lexer.debug_buffer, TREE_SITTER_SERIALIZATION_BUFFER_SIZE, __VA_ARGS__); \
-    ts_parser__log(self);                                                                   \
-  }
+    printf(__VA_ARGS__); \
+printf("\n");
 
 #define LOG_LOOKAHEAD(symbol_name, size)                      \
-  if (self->lexer.logger.log || self->dot_graph_file) {       \
-    char *buf = self->lexer.debug_buffer;                     \
+char buf[TREE_SITTER_SERIALIZATION_BUFFER_SIZE] = ""; \
     const char *symbol = symbol_name;                         \
     int off = snprintf(                                       \
       buf,                                                    \
@@ -60,8 +57,8 @@
       ", size:%u",                                            \
       size                                                    \
     );                                                        \
-    ts_parser__log(self);                                     \
-  }
+    printf("%s\n", buf);
+
 
 #define LOG_STACK()                                                              \
   if (self->dot_graph_file) {                                                    \
@@ -69,11 +66,8 @@
     fputs("\n\n", self->dot_graph_file);                                         \
   }
 
-#define LOG_TREE(tree)                                                      \
-  if (self->dot_graph_file) {                                               \
-    ts_subtree_print_dot_graph(tree, self->language, self->dot_graph_file); \
-    fputs("\n", self->dot_graph_file);                                      \
-  }
+#define LOG_TREE(tree) \
+    ts_subtree_print_dot_graph(tree, self->language, self->dot_graph_file);
 
 #define SYM_NAME(symbol) ts_language_symbol_name(self->language, symbol)
 
@@ -1862,6 +1856,7 @@ TSParser *ts_parser_new(void) {
   self->included_range_differences = (TSRangeArray) array_new();
   self->included_range_difference_index = 0;
   ts_parser__set_cached_token(self, 0, NULL_SUBTREE, NULL_SUBTREE);
+
   return self;
 }
 
@@ -1930,16 +1925,11 @@ void ts_parser_print_dot_graphs(TSParser *self, int fd) {
   if (self->dot_graph_file) {
     fclose(self->dot_graph_file);
   }
-
-  if (fd >= 0) {
     #ifdef _WIN32
     self->dot_graph_file = _fdopen(fd, "a");
     #else
     self->dot_graph_file = fdopen(fd, "a");
     #endif
-  } else {
-    self->dot_graph_file = NULL;
-  }
 }
 
 const size_t *ts_parser_cancellation_flag(const TSParser *self) {

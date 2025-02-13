@@ -157,6 +157,7 @@ static inline bool ts_subtree_can_inline(Length padding, Length size, uint32_t l
     padding.bytes < TS_MAX_INLINE_TREE_LENGTH &&
     padding.extent.row < 16 &&
     padding.extent.column < TS_MAX_INLINE_TREE_LENGTH &&
+    // size.bytes < TS_MAX_INLINE_TREE_LENGTH &&
     size.extent.row == 0 &&
     size.extent.column < TS_MAX_INLINE_TREE_LENGTH &&
     lookahead_bytes < 16;
@@ -619,6 +620,14 @@ void ts_subtree_release(SubtreePool *pool, Subtree self) {
   }
 }
 
+void ts_compare_trees(TSTree* left, TSTree* right)
+{
+  SubtreePool pool = ts_subtree_pool_new(32);
+  if (ts_subtree_compare(left->root, right->root, &pool) != 0) {
+    printf("SUBTREE DIFF");
+  }
+}
+
 int ts_subtree_compare(Subtree left, Subtree right, SubtreePool *pool) {
   array_push(&pool->tree_stack, ts_subtree_to_mut_unsafe(left));
   array_push(&pool->tree_stack, ts_subtree_to_mut_unsafe(right));
@@ -998,6 +1007,7 @@ void ts_subtree__print_dot_graph(const Subtree *self, uint32_t start_offset,
     "has-changes: %u\n"
     "depends-on-column: %u\n"
     "descendant-count: %u\n"
+          
     "repeat-depth: %u\n"
     "lookahead-bytes: %u",
     start_offset, end_offset,
@@ -1033,11 +1043,45 @@ void ts_subtree__print_dot_graph(const Subtree *self, uint32_t start_offset,
   }
 }
 
+#include <spawn.h>
+
+void invoke_and_wait(char **argv) {
+  pid_t pid;
+
+  int status = posix_spawn(&pid, argv[0], NULL, NULL, argv, NULL);
+  if (status == 0) {
+      // Wait for the child to finish
+    (void) waitpid(pid, &status, 0);
+  } else {
+      fprintf(stderr, "posix_spawn failed: %d\n", status);
+  }
+
+}
+void execute_dot2(const char *input_path, const char *output_path) {
+  const char *dotCommand[] = {"/opt/homebrew/bin/dot", "-Tsvg", input_path, "-o", output_path, NULL};  // Command and arguments
+  invoke_and_wait(dotCommand);
+
+  const char *openCommand[] = {"/usr/bin/open", "-g", "-a", "Safari", output_path, NULL};  // Command and arguments
+  invoke_and_wait(openCommand);
+}
+
 void ts_subtree_print_dot_graph(Subtree self, const TSLanguage *language, FILE *f) {
+  static int iterator = 0;
+  char dotFilePath[1024] = "";
+  sprintf(dotFilePath, "/tmp/%d.dot", iterator);
+
+  f = fopen(dotFilePath, "w");
   fprintf(f, "digraph tree {\n");
   fprintf(f, "edge [arrowhead=none]\n");
   ts_subtree__print_dot_graph(&self, 0, language, 0, f);
   fprintf(f, "}\n");
+  fclose(f);
+
+  char svgFilePath[1024] = "";
+  sprintf(svgFilePath, "/tmp/%d.svg", iterator);
+  execute_dot2(dotFilePath, svgFilePath);
+
+  iterator++;
 }
 
 const ExternalScannerState *ts_subtree_external_scanner_state(Subtree self) {

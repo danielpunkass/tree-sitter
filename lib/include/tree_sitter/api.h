@@ -429,7 +429,9 @@ TSRange *ts_tree_get_changed_ranges(
   const TSTree *new_tree,
   uint32_t *length
 );
+void ts_parser_compare(TSParser* self, TSParser* other);
 
+void ts_compare_trees(TSTree* left, TSTree* right);
 /**
  * Write a DOT graph describing the syntax tree to the given file.
  */

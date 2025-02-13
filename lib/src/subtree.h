@@ -231,6 +231,7 @@ static inline uint32_t ts_subtree_lookahead_bytes(Subtree self) { return SUBTREE
 static inline size_t ts_subtree_alloc_size(uint32_t child_count) {
   return child_count * sizeof(Subtree) + sizeof(SubtreeHeapData);
 }
+void ts_compare_trees(TSTree* left, TSTree* right);
 
 // Get a subtree's children, which are allocated immediately before the
 // tree's own heap data.

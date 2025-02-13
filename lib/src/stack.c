@@ -764,9 +764,45 @@ void ts_stack_clear(Stack *self) {
   }));
 }
 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#include <spawn.h>
+
+static void invoke_and_wait2(char **argv) {
+  pid_t pid;
+
+  int status = posix_spawn(&pid, argv[0], NULL, NULL, argv, NULL);
+  if (status == 0) {
+      // Wait for the child to finish
+    (void) waitpid(pid, &status, 0);
+  } else {
+      fprintf(stderr, "posix_spawn failed: %d\n", status);
+  }
+
+}
+void execute_dot3(const char *input_path, const char *output_path) {
+  const char *dotCommand[] = {"/opt/homebrew/bin/dot", "-Tsvg", input_path, "-o", output_path, NULL};  // Command and arguments
+  invoke_and_wait2(dotCommand);
+
+  const char *openCommand[] = {"/usr/bin/open", "-g", "-a", "Safari", output_path, NULL};  // Command and arguments
+  invoke_and_wait2(openCommand);
+}
 bool ts_stack_print_dot_graph(Stack *self, const TSLanguage *language, FILE *f) {
+  return;
   array_reserve(&self->iterators, 32);
-  if (!f) f = stderr;
+  static int iterator = 0;
+  bool runDotProcess = false;
+  char dotFilePath[1024] = "";
+  sprintf(dotFilePath, "/tmp/stack-%d.dot", iterator);
+  if (!f) {
+    runDotProcess = true;
+    f = fopen(dotFilePath, "w");
+  }
 
   fprintf(f, "digraph stack {\n");
   fprintf(f, "rankdir=\"RL\";\n");
@@ -892,8 +928,18 @@ bool ts_stack_print_dot_graph(Stack *self, const TSLanguage *language, FILE *f) 
 
   fprintf(f, "}\n");
 
+  fclose(f);
+  
+  if (runDotProcess) {
+    char svgFilePath[1024] = "";
+    sprintf(svgFilePath, "/tmp/stack-%d.svg", iterator);
+    execute_dot3(dotFilePath, svgFilePath);
+
+    iterator++;
+  }
   array_delete(&visited_nodes);
   return true;
 }
+
 
 #undef forceinline

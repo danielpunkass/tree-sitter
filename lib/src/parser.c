@@ -60,11 +60,7 @@ char buf[TREE_SITTER_SERIALIZATION_BUFFER_SIZE] = ""; \
     printf("%s\n", buf);
 
 
-#define LOG_STACK()                                                              \
-  if (self->dot_graph_file) {                                                    \
-    ts_stack_print_dot_graph(self->stack, self->language, self->dot_graph_file); \
-    fputs("\n\n", self->dot_graph_file);                                         \
-  }
+  #define LOG_STACK()                                                              
 
 #define LOG_TREE(tree) \
     ts_subtree_print_dot_graph(tree, self->language, self->dot_graph_file);
@@ -388,20 +384,12 @@ static void ts_parser__external_scanner_destroy(
 static unsigned ts_parser__external_scanner_serialize(
   TSParser *self
 ) {
-  if (ts_language_is_wasm(self->language)) {
-    return ts_wasm_store_call_scanner_serialize(
-      self->wasm_store,
-      (uintptr_t)self->external_scanner_payload,
-      self->lexer.debug_buffer
-    );
-  } else {
     uint32_t length = self->language->external_scanner.serialize(
       self->external_scanner_payload,
       self->lexer.debug_buffer
     );
     assert(length <= TREE_SITTER_SERIALIZATION_BUFFER_SIZE);
     return length;
-  }
 }
 
 static void ts_parser__external_scanner_deserialize(
@@ -415,40 +403,17 @@ static void ts_parser__external_scanner_deserialize(
     length = external_token.ptr->external_scanner_state.length;
   }
 
-  if (ts_language_is_wasm(self->language)) {
-    ts_wasm_store_call_scanner_deserialize(
-      self->wasm_store,
-      (uintptr_t)self->external_scanner_payload,
-      data,
-      length
-    );
-    if (ts_wasm_store_has_error(self->wasm_store)) {
-      self->has_scanner_error = true;
-    }
-  } else {
     self->language->external_scanner.deserialize(
       self->external_scanner_payload,
       data,
       length
     );
-  }
 }
 
 static bool ts_parser__external_scanner_scan(
   TSParser *self,
   TSStateId external_lex_state
 ) {
-  if (ts_language_is_wasm(self->language)) {
-    bool result = ts_wasm_store_call_scanner_scan(
-      self->wasm_store,
-      (uintptr_t)self->external_scanner_payload,
-      external_lex_state * self->language->external_token_count
-    );
-    if (ts_wasm_store_has_error(self->wasm_store)) {
-      self->has_scanner_error = true;
-    }
-    return result;
-  } else {
     const bool *valid_external_tokens = ts_language_enabled_external_tokens(
       self->language,
       external_lex_state
@@ -458,7 +423,6 @@ static bool ts_parser__external_scanner_scan(
       &self->lexer.data,
       valid_external_tokens
     );
-  }
 }
 
 static bool ts_parser__can_reuse_first_leaf(
@@ -753,7 +717,7 @@ static Subtree ts_parser__reuse_node(
     // Do not reuse an EOF node if the included ranges array has changes
     // later on in the file.
     if (ts_subtree_is_eof(result)) end_byte_offset = UINT32_MAX;
-
+#warning byte_offset is still 158 when we're pointing at the < symbol'
     if (byte_offset > position) {
       LOG("before_reusable_node symbol:%s", TREE_NAME(result));
       break;
@@ -1519,21 +1483,22 @@ static bool ts_parser__advance(
   bool did_reuse = true;
   Subtree lookahead = NULL_SUBTREE;
   TableEntry table_entry = {.action_count = 0};
-
+#warning I wonder if the "token" data returned by markdown parser is returning non-canonical values e.g. it seems like many are just serialized as 0 length empty
   // If possible, reuse a node from the previous syntax tree.
   if (allow_node_reuse) {
     lookahead = ts_parser__reuse_node(
       self, version, &state, position, last_external_token, &table_entry
     );
+    LOG("Node reuse lookahead = ")
   }
 
   // If no node from the previous syntax tree could be reused, then try to
   // reuse the token previously returned by the lexer.
   if (!lookahead.ptr) {
     did_reuse = false;
-    lookahead = ts_parser__get_cached_token(
-      self, state, position, last_external_token, &table_entry
-    );
+//    lookahead = ts_parser__get_cached_token(
+//      self, state, position, last_external_token, &table_entry
+//    );
   }
 
   bool needs_lex = !lookahead.ptr;
@@ -1983,6 +1948,28 @@ void ts_parser_reset(TSParser *self) {
   self->has_scanner_error = false;
 }
 
+//void checkTree(Subtree* self) {
+//    TSSymbol subtree_symbol = ts_subtree_symbol(*self);
+//    TSSymbol symbol = alias_symbol ? alias_symbol : subtree_symbol;
+//    uint32_t end_offset = start_offset + ts_subtree_total_bytes(*self);
+//
+//  uint32_t child_start_offset = start_offset;
+//    uint32_t child_info_offset =
+//      language->max_alias_sequence_length *
+//      ts_subtree_production_id(*self);
+//    for (uint32_t i = 0, n = ts_subtree_child_count(*self); i < n; i++) {
+//      const Subtree *child = &ts_subtree_children(*self)[i];
+//      TSSymbol subtree_alias_symbol = 0;
+//      if (!ts_subtree_extra(*child) && child_info_offset) {
+//        subtree_alias_symbol = language->alias_sequences[child_info_offset];
+//        child_info_offset++;
+//      }
+//      checkTree(child);
+//      child_start_offset += ts_subtree_total_bytes(*child);
+//    }
+//  }
+//}
+//
 TSTree *ts_parser_parse(
   TSParser *self,
   const TSTree *old_tree,

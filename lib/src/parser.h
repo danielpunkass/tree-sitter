@@ -39,6 +39,8 @@ typedef struct {
 
 typedef struct TSLexer TSLexer;
 
+void ts_parser_compare(TSParser* self, TSParser* other);
+
 struct TSLexer {
   int32_t lookahead;
   TSSymbol result_symbol;
